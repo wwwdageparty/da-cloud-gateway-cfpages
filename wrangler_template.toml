@@ -1,4 +1,11 @@
+name = "da-gateway-cfpages"
+compatibility_date = "2026-01-25"
+
 [[d1_databases]]
 binding = "DB"
-database_name = "darouter"
+database_name = "d1_database_name"
 database_id = "YOUR_DB_ID"
+
+[vars]
+DA_WRITE_TOKEN = "Demo111+"
+DA_GATEWAY_TOKEN = "Demo111+"
