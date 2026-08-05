@@ -1,6 +1,8 @@
-name = "da-gateway-cfpages"
+name = "da-filesystem-cfpages"
 compatibility_date = "2026-01-25"
+pages_build_output_dir = "./dist"
 
+[env.production]
 [[d1_databases]]
 binding = "DB"
 database_name = "d1_database_name"
@@ -9,3 +11,4 @@ database_id = "YOUR_DB_ID"
 [vars]
 DA_WRITE_TOKEN = "Demo111+"
 DA_GATEWAY_TOKEN = "Demo111+"
+

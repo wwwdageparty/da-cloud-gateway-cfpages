@@ -3,7 +3,7 @@ import { DA_SERVICE_MAP } from './router.js';
 // --- GLOBAL CONFIG ---
 export const ABLY_PUBLISH_BASE_URL = "https://rest.ably.io/channels";
 export const C_GATEWAY_TOKEN_NAME = "DA_GATEWAY_TOKEN";
-export const C_SERVICE = "da-cloud-cf-gateway";
+export const C_SERVICE = "da-cloud-gateway-cfpages";
 export const C_VERSION = "0.0.1";
 export const C_RouteTableName = "darouter";
 
