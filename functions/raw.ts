@@ -1,3 +1,8 @@
+import {
+  C_GATEWAY_TOKEN_NAME,
+  timingSafeCheck,
+} from "./_shared";
+
 interface EventContext<Env, P extends string, Data> {
   request: Request;
   env: Env;
@@ -7,22 +12,36 @@ interface EventContext<Env, P extends string, Data> {
   waitUntil: (promise: Promise<any>) => void;
 }
 
-interface Env {
-  // Add bindings or rack service bindings here if applicable
-  // e.g., FILES_RACK: Fetcher;
-  GATEWAY_SECRET?: string;
-}
-
-export const onRequestPost = async (context: EventContext<Env, any, any>): Promise<Response> => {
+export const onRequestPost = async (context: EventContext<Record<string, any>, any, any>): Promise<Response> => {
   const { request, env } = context;
 
-  // 1. Authorization Check (Shared with /api)
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return new Response(JSON.stringify({ error: "Unauthorized: Missing or invalid token" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+  // 1. Authorization Check (Uses shared token name key from _shared)
+  const expectedToken = env[C_GATEWAY_TOKEN_NAME];
+
+  if (expectedToken) {
+    const authHeader = request.headers.get("Authorization");
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Missing or invalid token" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const token = authHeader.slice(7);
+
+    if (!token || !(await timingSafeCheck(token, expectedToken))) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Token verification failed" }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
   }
 
   // 2. Extract Routing Headers
@@ -31,7 +50,6 @@ export const onRequestPost = async (context: EventContext<Env, any, any>): Promi
   const action = request.headers.get("X-DA-Action");     // "upload" | "download"
   const fileKey = request.headers.get("X-DA-File-Key");   // File path in bucket
 
-  // Validate required headers
   if (!service || !action || !fileKey) {
     return new Response(
       JSON.stringify({
@@ -44,8 +62,7 @@ export const onRequestPost = async (context: EventContext<Env, any, any>): Promi
     );
   }
 
-  // 3. Resolve Target Downstream Worker / Service Binding URL
-  // Construct internal rack URL or service binding target
+  // 3. Resolve Target Downstream Worker
   const targetUrl = new URL(`https://${service}-rack.internal/raw`);
   targetUrl.searchParams.set("version", version);
   targetUrl.searchParams.set("action", action);
@@ -54,23 +71,21 @@ export const onRequestPost = async (context: EventContext<Env, any, any>): Promi
   // 4. Prepare Headers for Downstream Request
   const downstreamHeaders = new Headers(request.headers);
   
-  // Optional: Attach an internal service key if your racks verify Gateway authenticity
-  if (env.GATEWAY_SECRET) {
-    downstreamHeaders.set("X-DA-Gateway-Secret", env.GATEWAY_SECRET);
+  if (expectedToken) {
+    downstreamHeaders.set("X-DA-Gateway-Secret", expectedToken);
   }
 
   try {
     // 5. Proxy Stream (Zero-Copy Pass-Through)
-    // Cloudflare Workers automatically stream `request.body` when passed as `body`
     const downstreamResponse = await fetch(targetUrl.toString(), {
       method: "POST",
       headers: downstreamHeaders,
-      body: request.body, // Pass-through ReadableStream directly
-      // @ts-ignore - dupex: 'half' is required by modern fetch implementations for streaming request bodies
+      body: request.body,
+      // @ts-ignore - duplex: 'half' is required by modern fetch implementations for streaming request bodies
       duplex: "half", 
     });
 
-    // 6. Return Downstream Response directly (Supports binary stream downloads)
+    // 6. Return Downstream Response directly
     return new Response(downstreamResponse.body, {
       status: downstreamResponse.status,
       statusText: downstreamResponse.statusText,

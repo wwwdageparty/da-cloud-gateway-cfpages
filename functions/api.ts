@@ -4,23 +4,29 @@ import {
   handleRest,
   handleAbly,
   findRouteFromDB,
+  timingSafeCheck,
 } from "./_shared";
 import { DA_SERVICE_MAP } from "./router";
 
 export async function onRequestPost(context: any) {
   const { request, env } = context;
 
+  const expectedToken = env[C_GATEWAY_TOKEN_NAME];
 
-  const auth = request.headers.get("Authorization");
-  if (!auth || !auth.startsWith("Bearer ")) {
-    return nack("unknown", "UNAUTHORIZED", "Missing or invalid Authorization header");
+  if (expectedToken) {
+    const auth = request.headers.get("Authorization");
+
+    if (!auth || !auth.startsWith("Bearer ")) {
+      return nack("unknown", "UNAUTHORIZED", "Missing or invalid Authorization header");
+    }
+
+    const token = auth.slice(7);
+
+    if (!token || !(await timingSafeCheck(token, expectedToken))) {
+      return nack("unknown", "INVALID_TOKEN", "Token authentication failed");
+    }
   }
-
-  const token = auth.split(" ")[1];
-  if (token !== env[C_GATEWAY_TOKEN_NAME]) {
-    return nack("unknown", "INVALID_TOKEN", "Token authentication failed");
-  }
-
+  
   let body: any;
   try {
     body = await request.json();

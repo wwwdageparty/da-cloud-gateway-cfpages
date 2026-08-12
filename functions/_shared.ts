@@ -26,6 +26,19 @@ export function nack(requestId: string, code: any, message: string) {
   );
 }
 
+export async function timingSafeCheck(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const aBuf = encoder.encode(a);
+  const bBuf = encoder.encode(b);
+
+  if (aBuf.byteLength !== bBuf.byteLength) {
+    crypto.subtle.timingSafeEqual(bBuf, bBuf);
+    return false;
+  }
+
+  return crypto.subtle.timingSafeEqual(aBuf, bBuf);
+}
+
 // ---------- HANDLERS ----------
 export async function handleRest(env: any, route: any, bodyJson: any) {
   let routeToken = route.token || (route.authKeyEnvName ? env[route.authKeyEnvName] : null);
